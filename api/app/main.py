@@ -407,4 +407,32 @@ def whoami(role: str = Depends(auth)):
     return {"role": role}
 
 
+
+# ---------- consumer group helpers / metrics ----------
+@app.post("/v1/streams/{name}/consumer-groups/{group}", dependencies=[Depends(auth)], status_code=201)
+def register_group(name: str, group: str):
+    get_stream(name)
+    if not group or len(group) > 200:
+        raise HTTPException(422, "invalid consumer group")
+    return {"stream": name, "group": group, "registered": True}
+
+@app.get("/v1/streams/{name}/consumer-groups", dependencies=[Depends(auth)])
+def list_groups(name: str):
+    get_stream(name)
+    c = Consumer({"bootstrap.servers": BROKERS, "group.id": f"_group_list_{uuid.uuid4()}"})
+    try:
+        groups = c.list_groups(timeout=5)
+        names = sorted({g.id for g in groups if g.id and not g.id.startswith("_")})
+        return {"stream": name, "groups": names}
+    finally:
+        c.close()
+
+@app.get("/v1/metrics", dependencies=[Depends(auth)])
+def metrics():
+    with db() as c, c.cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS streams, COALESCE(SUM(partitions),0) AS partitions FROM streams")
+        row = cur.fetchone()
+    return {"streams": row["streams"], "partitions": row["partitions"], "rate_limit_per_sec": RATE_LIMIT, "delivery": "at-least-once"}
+
+# Mount UI last so API routes above it are matched first.
 app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"), html=True), name="ui")
