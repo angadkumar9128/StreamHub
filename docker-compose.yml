@@ -1,11 +1,11 @@
 services:
   redpanda:
-    image: redpandadata/redpanda:latest
+    image: redpandadata/redpanda:v25.2.5
     command: >
       redpanda start --smp 1 --memory 1G --overprovisioned --node-id 0
       --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
-      --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
-    ports: ["19092:19092"]
+      --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092\n      --set redpanda.auto_create_topics_enabled=false
+    ports: ["19092:19092"]\n    healthcheck:\n      test: ["CMD-SHELL","rpk cluster health --brokers localhost:9092 | grep -q Healthy"]\n      interval: 5s\n      timeout: 5s\n      retries: 20
     volumes: ["redpanda_data:/var/lib/redpanda/data"]
 
   postgres:
@@ -14,7 +14,7 @@ services:
       POSTGRES_USER: streamhub
       POSTGRES_PASSWORD: streamhub
       POSTGRES_DB: streamhub
-    ports: ["5432:5432"]
+    ports: ["5432:5432"]\n    healthcheck:\n      test: ["CMD-SHELL","pg_isready -U streamhub -d streamhub"]\n      interval: 5s\n      timeout: 5s\n      retries: 20
     volumes: ["pg_data:/var/lib/postgresql/data"]
 
   minio:
@@ -29,7 +29,7 @@ services:
   api:
     build: ./api
     env_file: .env
-    depends_on: [redpanda, postgres]
+    depends_on:\n      redpanda: {condition: service_healthy}\n      postgres: {condition: service_healthy}
     ports: ["8000:8000"]
 
 volumes:
