@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import psycopg2, psycopg2.extras
 from confluent_kafka import Consumer, Producer, TopicPartition
 from confluent_kafka.admin import AdminClient, NewTopic
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,7 @@ BROKERS = os.environ["KAFKA_BROKERS"]
 DB_URL = os.environ["DATABASE_URL"]
 ADMIN_KEY = os.environ["ADMIN_API_KEY"]
 RATE_LIMIT = int(os.environ.get("RATE_LIMIT_PER_SEC", "200"))
+PUBLIC_BOOTSTRAP = os.environ.get("PUBLIC_KAFKA_BOOTSTRAP", "localhost:19092")
 
 app = FastAPI(title="StreamHub", version="0.1.0")
 producer = Producer({"bootstrap.servers": BROKERS, "compression.type": "lz4",
