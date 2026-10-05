@@ -82,7 +82,6 @@ envelope_schema = StructType([
     StructField("stream", StringType(), True),
     StructField("partition_key", StringType(), True),
     StructField("event_time", StringType(), True),
-    StructField("payload", StringType(), True),
 ])
 
 # COMMAND ----------
@@ -179,7 +178,7 @@ bronze_stream = (
         F.col("event.stream").alias("stream"),
         F.col("event.partition_key").alias("partition_key"),
         F.col("event.event_time").alias("event_time"),
-        F.col("event.payload").alias("payload_json"),
+        F.get_json_object("raw_json", "$.payload").alias("payload_json"),
         F.current_timestamp().alias("ingested_at"),
     )
 )
