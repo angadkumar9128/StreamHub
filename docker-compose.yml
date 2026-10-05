@@ -7,12 +7,16 @@ services:
       --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
       --set redpanda.auto_create_topics_enabled=false
     ports: ["19092:19092"]
+    # Use the broker connectivity check recommended by Redpanda's Docker
+    # quickstart. "rpk cluster health" can report unhealthy during the
+    # startup/recovery window even though the broker becomes healthy shortly
+    # afterward, which can make Compose permanently block dependent services.
     healthcheck:
-      test: ["CMD", "rpk", "cluster", "health"]
-      interval: 5s
-      timeout: 10s
-      retries: 30
-      start_period: 10s
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 10s
+      timeout: 15s
+      retries: 20
+      start_period: 30s
     volumes: ["redpanda_data:/var/lib/redpanda/data"]
 
   postgres:
