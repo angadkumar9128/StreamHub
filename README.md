@@ -182,3 +182,11 @@ GET    /health
 This is an Event Hubs-style engineering project, not a drop-in replacement with Azure Event Hubs SLA. Before public/production use, add multi-broker replication, TLS/SASL/OAuth, tenant isolation, resumable object-storage uploads, stronger schema formats (Avro/Protobuf/JSON Schema), quotas/backpressure, Prometheus/Grafana/OpenTelemetry, backups/disaster recovery, and Kubernetes or managed infrastructure.
 
 Delivery is deliberately at-least-once; events carry `event_id` so downstream systems can deduplicate. Exactly-once should only be claimed after validating the full producer-to-sink pipeline.
+
+## Databricks integration
+
+A complete Databricks integration guide is available in DATABRICKS_GUIDE.md. The end-to-end notebook is databricks/streamhub_end_to_end.py.
+
+The notebook demonstrates Kafka -> Delta Bronze -> Silver plus Unity Catalog operational metadata tables and Volume-backed checkpoints/support files. Databricks Cloud must be able to reach the advertised Kafka endpoint; localhost:19092 is only for local clients.
+
+For external clients, configure KAFKA_EXTERNAL_HOST and PUBLIC_KAFKA_BOOTSTRAP in .env. Compose uses the external host in Redpanda's advertised Kafka address so Databricks receives a usable endpoint.
