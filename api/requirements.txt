@@ -1,0 +1,6 @@
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+confluent-kafka==2.6.*
+psycopg2-binary==2.9.*
+python-multipart==0.0.*
+pyarrow==18.*

@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StreamHub</title>
+<style>
+:root{--bg:#0f1115;--card:#181b22;--bd:#2a2f3a;--tx:#e6e8ee;--mu:#8b92a5;--ac:#5b8cff;--ok:#3ecf8e;--er:#ff5d6c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif}
+header{display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+header h1{font-size:18px;margin:0;margin-right:auto}main{max-width:1100px;margin:0 auto;padding:20px}
+input,select,textarea,button{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font:inherit}
+textarea{width:100%;font-family:ui-monospace,monospace;min-height:80px}button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.d{color:var(--er)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.grid .card{cursor:pointer;margin:0}.grid .card:hover{border-color:var(--ac)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.mu{color:var(--mu)}.ok{color:var(--ok)}.er{color:var(--er)}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:5px 8px;border-bottom:1px solid var(--bd)}
+pre{background:#0b0d11;padding:10px;border-radius:6px;overflow:auto;max-height:260px;margin:6px 0}h3{margin:4px 0 8px}
+.tabs button{margin-right:6px}.tabs .on{border-color:var(--ac)}#msg{position:fixed;bottom:16px;right:16px;max-width:380px}
+</style></head><body>
+<header><h1>⚡ StreamHub</h1><input id="key" type="password" placeholder="API key" size="26"><button class="p" onclick="connect()">Connect</button><span id="role" class="mu"></span></header>
+<main><div class="tabs row"><button id="t-s" class="on" onclick="tab('s')">Streams</button><button id="t-k" onclick="tab('k')">API keys</button></div>
+<div id="v-s"><div class="card"><h3>Create stream</h3><div class="row">
+<input id="n" placeholder="name (a-z, 0-9, -)"><input id="pt" type="number" value="3" min="1" style="width:80px" title="partitions"><input id="rt" type="number" value="24" min="1" style="width:90px" title="retention hours"><input id="pk" placeholder="partition key field (optional)"><button class="p" onclick="createStream()">Create</button></div></div>
+<div id="list" class="grid"></div><div id="detail"></div></div>
+<div id="v-k" hidden><div class="card"><h3>Create key</h3><div class="row"><input id="kn" placeholder="name"><select id="kr"><option>producer</option><option>consumer</option><option>admin</option></select><button class="p" onclick="mkKey()">Create</button></div><pre id="newkey" hidden></pre></div>
+<div class="card"><table id="keys"></table></div></div></main><div id="msg" class="card" hidden></div>
+<script>
+const $=id=>document.getElementById(id);let cur=null,timer=null;$('key').value=localStorage.sk||'';
+const toast=(t,e)=>{const m=$('msg');m.textContent=t;m.className='card '+(e?'er':'ok');m.hidden=false;setTimeout(()=>m.hidden=true,4000)};
+async function api(m,p,b,raw){const o={method:m,headers:{'x-api-key':$('key').value}};if(b&&!raw){o.headers['content-type']='application/json';o.body=JSON.stringify(b)}else if(raw)o.body=b;
+ const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok){toast(j.detail?JSON.stringify(j.detail):r.status,1);throw j}return j}
+async function connect(){localStorage.sk=$('key').value;try{const w=await api('GET','/v1/whoami');$('role').textContent='role: '+w.role;load();keys()}catch(e){}}
+function tab(t){['s','k'].forEach(x=>{$('v-'+x).hidden=x!=t;$('t-'+x).className=x==t?'on':''});}
+async function load(){const l=await api('GET','/v1/streams');$('list').innerHTML=l.map(s=>`<div class="card" onclick="open_('${s.name}')"><b>${s.name}</b><div class="mu">${s.partitions} partitions · ${s.retention_hours}h retention</div><div class="mu">key: ${s.partition_key||'round-robin'}</div></div>`).join('')||'<span class="mu">No streams yet.</span>'}
+async function createStream(){await api('POST','/v1/streams',{name:$('n').value,partitions:+$('pt').value,retention_hours:+$('rt').value,partition_key:$('pk').value||null});toast('Stream created');load()}
+async function open_(n){cur=n;clearInterval(timer);const s=await api('GET','/v1/streams/'+n);
+ $('detail').innerHTML=`<div class="card"><div class="row"><h3 style="margin-right:auto">${n} <span class="mu">· ${s.total_events} events</span></h3><button class="d" onclick="del()">Delete stream</button></div>
+ <table><tr><th>Partition</th><th>Earliest</th><th>Latest</th><th>Events</th></tr>${s.partitions_detail.map(p=>`<tr><td>${p.partition}</td><td>${p.earliest}</td><td>${p.latest}</td><td>${p.events}</td></tr>`).join('')}</table></div>
+ <div class="card"><h3>Publish event</h3><textarea id="ev">{"customer_id":123,"amount":4500,"city":"Bengaluru"}</textarea><div class="row"><button class="p" onclick="pub()">Send</button><input type="file" id="f" accept=".csv,.jsonl,.ndjson,.parquet"><button onclick="up()">Upload file</button></div></div>
+ <div class="card"><h3>Schema ${s.schema?'<span class="ok">(active)</span>':'<span class="mu">(none)</span>'}</h3><pre>${JSON.stringify(s.schema||{},null,1)}</pre><textarea id="sc">{"customer_id":"integer","amount":"double"}</textarea><div class="row"><button onclick="addSchema()">Register new version</button></div></div>
+ <div class="card"><h3>Consumer lag</h3><div class="row"><input id="grp" value="databricks"><button onclick="lag()">Check</button></div><pre id="lag" hidden></pre></div>
+ <div class="card"><div class="row"><h3 style="margin-right:auto">Live tail</h3><label class="mu"><input type="checkbox" id="auto" onchange="auto()"> auto (3s)</label><button onclick="tail()">Refresh</button></div><pre id="tail"></pre></div>`;tail()}
+const parse=t=>{try{return JSON.parse(t)}catch(e){toast('Invalid JSON',1);throw e}};
+async function pub(){const r=await api('POST',`/v1/streams/${cur}/events`,parse($('ev').value));toast('Accepted '+r.accepted);open_(cur)}
+async function up(){const f=$('f').files[0];if(!f)return toast('Pick a file',1);const d=new FormData();d.append('file',f);const r=await api('POST',`/v1/streams/${cur}/upload`,d,true);toast(`Published ${r.published}, DLQ ${r.rejected_to_dlq}`);open_(cur)}
+async function addSchema(){const r=await api('POST',`/v1/streams/${cur}/schemas`,parse($('sc').value));toast('Schema v'+r.version);open_(cur)}
+async function lag(){const r=await api('GET',`/v1/streams/${cur}/consumer-groups/${$('grp').value}/lag`);$('lag').hidden=false;$('lag').textContent=JSON.stringify(r,null,1)}
+async function tail(){const r=await api('GET',`/v1/streams/${cur}/peek?limit=20`);$('tail').textContent=r.map(e=>`p${e.partition}@${e.offset}  ${JSON.stringify(e.event.payload)}`).join('\n')||'(empty)'}
+function auto(){clearInterval(timer);if($('auto').checked)timer=setInterval(tail,3000)}
+async function del(){if(confirm('Delete '+cur+'?')){await api('DELETE','/v1/streams/'+cur);$('detail').innerHTML='';load()}}
+async function keys(){try{const k=await api('GET','/v1/keys');$('keys').innerHTML='<tr><th>ID</th><th>Name</th><th>Role</th><th></th></tr>'+k.map(x=>`<tr><td>${x.id}</td><td>${x.name}</td><td>${x.role}</td><td><button class="d" onclick="rmKey(${x.id})">Revoke</button></td></tr>`).join('')}catch(e){}}
+async function mkKey(){const r=await api('POST','/v1/keys',{name:$('kn').value,role:$('kr').value});$('newkey').hidden=false;$('newkey').textContent='Copy now (shown once):\n'+r.api_key;keys()}
+async function rmKey(i){await api('DELETE','/v1/keys/'+i);keys()}
+if($('key').value)connect();
+</script></body></html>
