@@ -148,7 +148,7 @@ def create_stream(s: StreamIn):
     with db() as c, c.cursor() as cur:
         cur.execute("INSERT INTO streams(name,partitions,retention_hours,partition_key) VALUES(%s,%s,%s,%s)",
                     (s.name, s.partitions, s.retention_hours, s.partition_key))
-    return {**s.model_dump(), "bootstrap_server_external": "localhost:19092", "topic": s.name}
+    return {**s.model_dump(), "bootstrap_server_external": PUBLIC_BOOTSTRAP, "topic": s.name}
 
 
 @app.get("/v1/streams", dependencies=[Depends(auth)])
