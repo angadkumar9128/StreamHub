@@ -1,1 +1,6 @@
 .myfile
+__pycache__/
+*.py[cod]
+.env
+*.Zone.Identifier
+.pytest_cache/
