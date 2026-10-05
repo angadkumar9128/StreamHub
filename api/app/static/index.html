@@ -1,56 +1,157 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>StreamHub</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StreamHub Control Center</title>
 <style>
-:root{--bg:#0f1115;--card:#181b22;--bd:#2a2f3a;--tx:#e6e8ee;--mu:#8b92a5;--ac:#5b8cff;--ok:#3ecf8e;--er:#ff5d6c}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px system-ui,sans-serif}
-header{display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
-header h1{font-size:18px;margin:0;margin-right:auto}main{max-width:1100px;margin:0 auto;padding:20px}
-input,select,textarea,button{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 10px;font:inherit}
-textarea{width:100%;font-family:ui-monospace,monospace;min-height:80px}button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.d{color:var(--er)}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.grid .card{cursor:pointer;margin:0}.grid .card:hover{border-color:var(--ac)}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.mu{color:var(--mu)}.ok{color:var(--ok)}.er{color:var(--er)}
-table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:5px 8px;border-bottom:1px solid var(--bd)}
-pre{background:#0b0d11;padding:10px;border-radius:6px;overflow:auto;max-height:260px;margin:6px 0}h3{margin:4px 0 8px}
-.tabs button{margin-right:6px}.tabs .on{border-color:var(--ac)}#msg{position:fixed;bottom:16px;right:16px;max-width:380px}
-</style></head><body>
-<header><h1>⚡ StreamHub</h1><input id="key" type="password" placeholder="API key" size="26"><button class="p" onclick="connect()">Connect</button><span id="role" class="mu"></span></header>
-<main><div class="tabs row"><button id="t-s" class="on" onclick="tab('s')">Streams</button><button id="t-k" onclick="tab('k')">API keys</button></div>
-<div id="v-s"><div class="card"><h3>Create stream</h3><div class="row">
-<input id="n" placeholder="name (a-z, 0-9, -)"><input id="pt" type="number" value="3" min="1" style="width:80px" title="partitions"><input id="rt" type="number" value="24" min="1" style="width:90px" title="retention hours"><input id="pk" placeholder="partition key field (optional)"><button class="p" onclick="createStream()">Create</button></div></div>
-<div id="list" class="grid"></div><div id="detail"></div></div>
-<div id="v-k" hidden><div class="card"><h3>Create key</h3><div class="row"><input id="kn" placeholder="name"><select id="kr"><option>producer</option><option>consumer</option><option>admin</option></select><button class="p" onclick="mkKey()">Create</button></div><pre id="newkey" hidden></pre></div>
-<div class="card"><table id="keys"></table></div></div></main><div id="msg" class="card" hidden></div>
+:root{--bg:#080b12;--panel:#101621;--panel2:#151d2a;--line:#263245;--text:#eef3fb;--muted:#8c9ab0;--blue:#5b8cff;--green:#39d98a;--red:#ff6575;--shadow:0 16px 40px rgba(0,0,0,.28)}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#17243d 0,#080b12 42%);color:var(--text);font:14px Inter,system-ui,-apple-system,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+button{cursor:pointer}button:hover{border-color:#45638e}.primary{background:var(--blue);border-color:var(--blue);color:white;font-weight:650}.danger{color:var(--red)}
+header{position:sticky;top:0;z-index:5;background:rgba(8,11,18,.9);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:750;margin-right:auto}.bolt{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#1c2c4a;color:#8fb2ff}
+main{max-width:1240px;margin:auto;padding:24px}.tabs{display:flex;gap:8px;margin-bottom:20px}.tabs button{background:transparent}.tabs .active{background:var(--panel2);border-color:#496da4}
+.hero{background:linear-gradient(135deg,rgba(91,140,255,.18),rgba(16,22,33,.9));border:1px solid #314463;border-radius:18px;padding:24px;box-shadow:var(--shadow);margin-bottom:18px}
+.hero h1{margin:0 0 8px;font-size:28px}.hero p{margin:0;color:var(--muted);max-width:760px;line-height:1.55}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.card{background:rgba(16,22,33,.92);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}.cards .card{margin:0}
+.metric{font-size:26px;font-weight:750;margin-top:5px}.label,.muted{color:var(--muted)}.ok{color:var(--green)}.err{color:var(--red)}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.spacer{margin-left:auto}
+.stream-card{cursor:pointer;transition:.15s}.stream-card:hover{transform:translateY(-2px);border-color:#4b6f9f}
+.stream-title{font-size:17px;font-weight:700}.pill{display:inline-block;padding:4px 8px;border-radius:99px;background:#1a2739;color:#9dbbff;font-size:12px}
+textarea{width:100%;min-height:120px;font-family:ui-monospace,SFMono-Regular,monospace;line-height:1.45}pre{white-space:pre-wrap;word-break:break-word;background:#090d14;border:1px solid var(--line);padding:13px;border-radius:10px;max-height:360px;overflow:auto}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line)}
+.drop{border:1px dashed #49698f;border-radius:12px;padding:18px;text-align:center;background:#0c121d}.drop input{width:100%}
+.notice{padding:11px 13px;border-radius:10px;background:#121d2d;border:1px solid #2b4364;color:#adc4e8;line-height:1.45}
+.hidden{display:none!important}.section-title{margin:0 0 10px}.small{font-size:12px}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}header{padding:12px}main{padding:14px}}@media(max-width:520px){.grid{grid-template-columns:1fr}.hero h1{font-size:22px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="bolt">⚡</span> StreamHub</div>
+  <input id="key" type="password" placeholder="Admin / API key" size="25">
+  <button class="primary" onclick="connect()">Connect</button>
+  <span id="role" class="muted"></span>
+</header>
+<main>
+  <div class="hero">
+    <h1>Streaming control center</h1>
+    <p>Create streams, upload structured or semi-structured files, publish events, inspect partitions and offsets, monitor live traffic, and prepare a Databricks Structured Streaming connection from one place.</p>
+  </div>
+  <div class="tabs">
+    <button id="tabDash" class="active" onclick="showTab('dash')">Overview</button>
+    <button id="tabStreams" onclick="showTab('streams')">Streams</button>
+    <button id="tabDbx" onclick="showTab('dbx')">Databricks</button>
+    <button id="tabKeys" onclick="showTab('keys')">API Keys</button>
+  </div>
+
+  <section id="dash">
+    <div class="grid">
+      <div class="card"><div class="label">Streams</div><div id="mStreams" class="metric">—</div></div>
+      <div class="card"><div class="label">Partitions</div><div id="mPartitions" class="metric">—</div></div>
+      <div class="card"><div class="label">Events visible</div><div id="mEvents" class="metric">—</div></div>
+      <div class="card"><div class="label">API status</div><div id="mStatus" class="metric ok">—</div></div>
+    </div>
+    <div class="cards" style="margin-top:14px">
+      <div class="card"><h3 class="section-title">Quick start</h3>
+        <ol class="muted"><li>Create a stream.</li><li>Publish an event or upload CSV/JSONL/NDJSON/Parquet.</li><li>Open the stream and inspect live tail/offsets.</li><li>Use the Databricks tab for the Kafka endpoint and notebook configuration.</li></ol>
+      </div>
+      <div class="card"><h3 class="section-title">Data flow</h3>
+        <div class="notice">Producer / File → StreamHub API → Redpanda → Consumer groups / REST → Databricks Structured Streaming → Delta Bronze → Silver → Gold</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="streams" class="hidden">
+    <div class="card"><h3 class="section-title">Create stream</h3>
+      <div class="row">
+        <input id="name" placeholder="orders">
+        <input id="parts" type="number" value="3" min="1" max="64" style="width:90px" title="Partitions">
+        <input id="retention" type="number" value="24" min="1" max="720" style="width:100px" title="Retention hours">
+        <input id="pkey" placeholder="partition key field, e.g. customer_id" style="min-width:230px">
+        <button class="primary" onclick="createStream()">Create stream</button>
+      </div>
+    </div>
+    <div id="streamList" class="cards"></div>
+    <div id="detail"></div>
+  </section>
+
+  <section id="dbx" class="hidden">
+    <div class="card"><h3 class="section-title">Databricks connection</h3>
+      <div class="notice">Databricks Cloud cannot connect to <b>localhost:19092</b>. Set <code>KAFKA_EXTERNAL_HOST</code> and <code>PUBLIC_KAFKA_BOOTSTRAP</code> to a host reachable from Databricks compute.</div>
+      <div class="row" style="margin-top:12px"><select id="dbxStream"></select><input id="dbxGroup" value="databricks-orders-bronze"><button class="primary" onclick="loadDbx()">Generate connection</button></div>
+      <pre id="dbxOut">Select a stream and generate the Databricks configuration.</pre>
+    </div>
+    <div class="cards">
+      <div class="card"><h3 class="section-title">Recommended storage</h3><div class="muted">Unity Catalog tables: Bronze/Silver/Gold data and operational metadata.<br><br>Unity Catalog Volume: checkpoints, schema artifacts, manifests and optional raw-file archive.</div></div>
+      <div class="card"><h3 class="section-title">Notebook</h3><div class="muted">Use <code>databricks/streamhub_end_to_end.py</code> from this repository. It creates the catalog objects, tests Kafka connectivity, writes Bronze, Silver and pipeline metadata, and uses a durable Volume checkpoint.</div></div>
+    </div>
+  </section>
+
+  <section id="keys" class="hidden">
+    <div class="card"><h3 class="section-title">Create API key</h3>
+      <div class="row"><input id="keyName" placeholder="producer-app"><select id="keyRole"><option>producer</option><option>consumer</option><option>admin</option></select><button class="primary" onclick="createKey()">Create</button></div>
+      <pre id="newKey" class="hidden"></pre>
+    </div>
+    <div class="card"><div id="keyTable"></div></div>
+  </section>
+</main>
+
 <script>
-const $=id=>document.getElementById(id);let cur=null,timer=null;$('key').value=localStorage.sk||'';
-const toast=(t,e)=>{const m=$('msg');m.textContent=t;m.className='card '+(e?'er':'ok');m.hidden=false;setTimeout(()=>m.hidden=true,4000)};
-async function api(m,p,b,raw){const o={method:m,headers:{'x-api-key':$('key').value}};if(b&&!raw){o.headers['content-type']='application/json';o.body=JSON.stringify(b)}else if(raw)o.body=b;
- const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok){toast(j.detail?JSON.stringify(j.detail):r.status,1);throw j}return j}
-async function connect(){localStorage.sk=$('key').value;try{const w=await api('GET','/v1/whoami');$('role').textContent='role: '+w.role;load();keys()}catch(e){}}
-function tab(t){['s','k'].forEach(x=>{$('v-'+x).hidden=x!=t;$('t-'+x).className=x==t?'on':''});}
-async function load(){const l=await api('GET','/v1/streams');$('list').innerHTML=l.map(s=>`<div class="card" onclick="open_('${s.name}')"><b>${s.name}</b><div class="mu">${s.partitions} partitions · ${s.retention_hours}h retention</div><div class="mu">key: ${s.partition_key||'round-robin'}</div></div>`).join('')||'<span class="mu">No streams yet.</span>'}
-async function createStream(){await api('POST','/v1/streams',{name:$('n').value,partitions:+$('pt').value,retention_hours:+$('rt').value,partition_key:$('pk').value||null});toast('Stream created');load()}
-async function open_(n){cur=n;clearInterval(timer);const s=await api('GET','/v1/streams/'+n);
- $('detail').innerHTML=`<div class="card"><div class="row"><h3 style="margin-right:auto">${n} <span class="mu">· ${s.total_events} events</span></h3><button class="d" onclick="del()">Delete stream</button></div>
- <table><tr><th>Partition</th><th>Earliest</th><th>Latest</th><th>Events</th></tr>${s.partitions_detail.map(p=>`<tr><td>${p.partition}</td><td>${p.earliest}</td><td>${p.latest}</td><td>${p.events}</td></tr>`).join('')}</table></div>
- <div class="card"><h3>Publish event</h3><textarea id="ev">{"customer_id":123,"amount":4500,"city":"Bengaluru"}</textarea><div class="row"><button class="p" onclick="pub()">Send</button><input type="file" id="f" accept=".csv,.jsonl,.ndjson,.parquet"><button onclick="up()">Upload file</button></div></div>
- <div class="card"><h3>Schema ${s.schema?'<span class="ok">(active)</span>':'<span class="mu">(none)</span>'}</h3><pre>${JSON.stringify(s.schema||{},null,1)}</pre><textarea id="sc">{"customer_id":"integer","amount":"double"}</textarea><div class="row"><button onclick="addSchema()">Register new version</button></div></div>
- <div class="card"><h3>Receiver connection</h3><div class="row"><button onclick="showConn()">Load Kafka connection</button><button onclick="httpRead()">Read next 20 via REST</button></div><pre id="conn" hidden></pre><pre id="httpout" hidden></pre></div>
- <div class="card"><h3>Consumer lag</h3><div class="row"><input id="grp" value="databricks"><button onclick="registerGroup()">Register group</button><button onclick="lag()">Check</button></div><pre id="lag" hidden></pre></div>
- <div class="card"><div class="row"><h3 style="margin-right:auto">Live tail</h3><label class="mu"><input type="checkbox" id="auto" onchange="auto()"> auto (3s)</label><button onclick="tail()">Refresh</button></div><pre id="tail"></pre></div>`;tail()}
-const parse=t=>{try{return JSON.parse(t)}catch(e){toast('Invalid JSON',1);throw e}};
-async function pub(){const r=await api('POST',`/v1/streams/${cur}/events`,parse($('ev').value));toast('Accepted '+r.accepted);open_(cur)}
-async function up(){const f=$('f').files[0];if(!f)return toast('Pick a file',1);const d=new FormData();d.append('file',f);const r=await api('POST',`/v1/streams/${cur}/upload`,d,true);toast(`Published ${r.published}, DLQ ${r.rejected_to_dlq}`);open_(cur)}
-async function addSchema(){const r=await api('POST',`/v1/streams/${cur}/schemas`,parse($('sc').value));toast('Schema v'+r.version);open_(cur)}
-async function lag(){const r=await api('GET',`/v1/streams/${cur}/consumer-groups/${encodeURIComponent($('grp').value)}/lag`);$('lag').hidden=false;$('lag').textContent=JSON.stringify(r,null,1)}
-async function registerGroup(){const r=await api('POST',`/v1/streams/${cur}/consumer-groups/${encodeURIComponent($('grp').value)}`);toast('Registered '+r.group)}
-async function showConn(){const r=await api('GET',`/v1/streams/${cur}/connection?group=${encodeURIComponent($('grp').value)}`);$('conn').hidden=false;$('conn').textContent=JSON.stringify(r,null,1)}
-async function httpRead(){const r=await api('GET',`/v1/streams/${cur}/events?partition=0&offset=latest&limit=20&timeout_ms=500`);$('httpout').hidden=false;$('httpout').textContent=JSON.stringify(r,null,1)}
-async function tail(){const r=await api('GET',`/v1/streams/${cur}/peek?limit=20`);$('tail').textContent=r.map(e=>`p${e.partition}@${e.offset}  ${JSON.stringify(e.event.payload)}`).join('\n')||'(empty)'}
+const $=id=>document.getElementById(id); let current=null, timer=null;
+$('key').value=localStorage.getItem('streamhub_key')||'';
+function toast(msg){console.log(msg)}
+async function api(method,path,body,raw=false){
+  const headers={'x-api-key':$('key').value};
+  const opts={method,headers};
+  if(body&&!raw){headers['content-type']='application/json';opts.body=JSON.stringify(body)}
+  if(raw)opts.body=body;
+  const r=await fetch(path,opts); const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.detail?JSON.stringify(j.detail):'HTTP '+r.status);
+  return j;
+}
+async function connect(){
+  localStorage.setItem('streamhub_key',$('key').value);
+  try{const r=await api('GET','/v1/whoami');$('role').textContent='role: '+r.role;await refresh();await keys()}catch(e){$('role').textContent='connection failed';$('role').className='err'}
+}
+function showTab(t){
+  ['dash','streams','dbx','keys'].forEach(x=>$(x).classList.toggle('hidden',x!==t));
+  ['Dash','Streams','Dbx','Keys'].forEach(x=>$('tab'+x).classList.toggle('active',x.toLowerCase()===t));
+  if(t==='streams')refreshStreams(); if(t==='dbx')fillDbxStreams(); if(t==='keys')keys();
+}
+async function refresh(){try{const r=await fetch('/health');$('mStatus').textContent=r.ok?'Healthy':'Down';$('mStatus').className='metric '+(r.ok?'ok':'err');await refreshStreams()}catch(e){$('mStatus').textContent='Down';$('mStatus').className='metric err'}}
+async function refreshStreams(){
+  try{const list=await api('GET','/v1/streams');let p=0,e=0;list.forEach(s=>{p+=s.partitions});$('mStreams').textContent=list.length;$('mPartitions').textContent=p;$('mEvents').textContent='—';
+  $('streamList').innerHTML=list.map(s=>'<div class="card stream-card" onclick="openStream(\''+s.name+'\')"><div class="stream-title">'+esc(s.name)+'</div><p class="muted">'+s.partitions+' partitions · '+s.retention_hours+'h retention</p><span class="pill">'+esc(s.partition_key||'round-robin')+'</span></div>').join('')||'<div class="card muted">No streams yet.</div>';
+  await fillDbxStreams()}catch(e){$('streamList').innerHTML='<div class="card err">'+esc(e.message)+'</div>'}
+}
+function esc(v){return String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+async function createStream(){try{await api('POST','/v1/streams',{name:$('name').value,partitions:+$('parts').value,retention_hours:+$('retention').value,partition_key:$('pkey').value||null});$('name').value='';await refreshStreams();showTab('streams')}catch(e){alert(e.message)}}
+async function openStream(n){
+  current=n;clearInterval(timer);showTab('streams');
+  try{const s=await api('GET','/v1/streams/'+encodeURIComponent(n));
+  $('detail').innerHTML='<div class="card"><div class="row"><h2 style="margin:0">'+esc(n)+'</h2><span class="pill">'+s.total_events+' events</span><button class="danger spacer" onclick="deleteStream()">Delete</button></div><table><tr><th>Partition</th><th>Earliest</th><th>Latest</th><th>Events</th></tr>'+s.partitions_detail.map(p=>'<tr><td>'+p.partition+'</td><td>'+p.earliest+'</td><td>'+p.latest+'</td><td>'+p.events+'</td></tr>').join('')+'</table></div>'+
+  '<div class="cards"><div class="card"><h3>Publish event</h3><textarea id="event">{"customer_id":123,"amount":4500,"city":"Bengaluru","product":"Laptop"}</textarea><button class="primary" onclick="publish()">Send event</button></div>'+
+  '<div class="card"><h3>Upload data</h3><div class="drop"><p>CSV · JSONL · NDJSON · Parquet</p><input id="file" type="file" accept=".csv,.json,.jsonl,.ndjson,.parquet"><button class="primary" onclick="upload()">Upload and stream</button></div><p class="muted small">Records are streamed incrementally; rejected records go to the stream DLQ.</p></div></div>'+
+  '<div class="card"><h3>Schema</h3><pre>'+esc(JSON.stringify(s.schema||{},null,2))+'</pre><textarea id="schema">{"customer_id":"integer","amount":"double","city":"string","product":"string"}</textarea><button onclick="schema()">Register schema version</button></div>'+
+  '<div class="card"><div class="row"><h3 style="margin:0">Live tail</h3><label class="spacer"><input id="auto" type="checkbox" onchange="auto()"> auto refresh</label><button onclick="tail()">Refresh</button></div><pre id="tail"></pre></div>'+
+  '<div class="card"><h3>Databricks / consumer connection</h3><div class="row"><input id="group" value="databricks-orders-bronze"><button onclick="connection()">Show Kafka connection</button><button onclick="readEvents()">Read REST receiver</button></div><pre id="connection"></pre><pre id="readout"></pre></div>';
+  await tail()}catch(e){$('detail').innerHTML='<div class="card err">'+esc(e.message)+'</div>'}
+}
+async function publish(){try{const r=await api('POST','/v1/streams/'+current+'/events',JSON.parse($('event').value));alert('Accepted '+r.accepted);openStream(current)}catch(e){alert(e.message)}}
+async function upload(){const f=$('file').files[0];if(!f)return alert('Choose a file');const d=new FormData();d.append('file',f);try{const r=await api('POST','/v1/streams/'+current+'/upload',d,true);alert('Published '+r.published+' · DLQ '+r.rejected_to_dlq);openStream(current)}catch(e){alert(e.message)}}
+async function schema(){try{const r=await api('POST','/v1/streams/'+current+'/schemas',JSON.parse($('schema').value));alert('Schema v'+r.version);openStream(current)}catch(e){alert(e.message)}}
+async function tail(){if(!current)return;try{const r=await api('GET','/v1/streams/'+current+'/peek?limit=20');$('tail').textContent=r.map(x=>'p'+x.partition+' @ '+x.offset+'  '+JSON.stringify(x.event.payload)).join('\n')||'(no events)'}catch(e){$('tail').textContent=e.message}}
 function auto(){clearInterval(timer);if($('auto').checked)timer=setInterval(tail,3000)}
-async function del(){if(confirm('Delete '+cur+'?')){await api('DELETE','/v1/streams/'+cur);$('detail').innerHTML='';load()}}
-async function keys(){try{const k=await api('GET','/v1/keys');$('keys').innerHTML='<tr><th>ID</th><th>Name</th><th>Role</th><th></th></tr>'+k.map(x=>`<tr><td>${x.id}</td><td>${x.name}</td><td>${x.role}</td><td><button class="d" onclick="rmKey(${x.id})">Revoke</button></td></tr>`).join('')}catch(e){}}
-async function mkKey(){const r=await api('POST','/v1/keys',{name:$('kn').value,role:$('kr').value});$('newkey').hidden=false;$('newkey').textContent='Copy now (shown once):\n'+r.api_key;keys()}
-async function rmKey(i){await api('DELETE','/v1/keys/'+i);keys()}
-if($('key').value)connect();
-</script></body></html>
+async function connection(){try{$('connection').textContent=JSON.stringify(await api('GET','/v1/streams/'+current+'/connection?group='+encodeURIComponent($('group').value)),null,2)}catch(e){$('connection').textContent=e.message}}
+async function readEvents(){try{$('readout').textContent=JSON.stringify(await api('GET','/v1/streams/'+current+'/events?partition=0&offset=earliest&limit=20&timeout_ms=500'),null,2)}catch(e){$('readout').textContent=e.message}}
+async function deleteStream(){if(confirm('Delete '+current+'?')){try{await api('DELETE','/v1/streams/'+current);$('detail').innerHTML='';await refreshStreams()}catch(e){alert(e.message)}}}
+async function fillDbxStreams(){try{const list=await api('GET','/v1/streams');$('dbxStream').innerHTML=list.map(s=>'<option value="'+esc(s.name)+'">'+esc(s.name)+'</option>').join('')}catch(e){}}
+async function loadDbx(){const s=$('dbxStream').value,g=$('dbxGroup').value;try{const r=await api('GET','/v1/streams/'+encodeURIComponent(s)+'/connection?group='+encodeURIComponent(g));$('dbxOut').textContent='Kafka bootstrap: '+r.bootstrap_server+'\nTopic: '+r.topic+'\nConsumer group: '+r.consumer_group+'\n\nDatabricks Spark:\n'+r.client_examples.databricks+'\n\nCheckpoint recommendation:\n/Volumes/streamhub/streaming/streamhub_files/checkpoints/'+s+'_bronze';}catch(e){$('dbxOut').textContent=e.message}}
+async function keys(){try{const k=await api('GET','/v1/keys');$('keyTable').innerHTML='<table><tr><th>ID</th><th>Name</th><th>Role</th><th>Created</th><th></th></tr>'+k.map(x=>'<tr><td>'+x.id+'</td><td>'+esc(x.name)+'</td><td>'+x.role+'</td><td>'+x.created_at+'</td><td><button class="danger" onclick="revoke('+x.id+')">Revoke</button></td></tr>').join('')+'</table>'}catch(e){$('keyTable').innerHTML='<div class="muted">Admin key required.</div>'}}
+async function createKey(){try{const r=await api('POST','/v1/keys',{name:$('keyName').value,role:$('keyRole').value});$('newKey').classList.remove('hidden');$('newKey').textContent='Copy now — shown once:\n'+r.api_key;await keys()}catch(e){alert(e.message)}}
+async function revoke(id){if(confirm('Revoke key '+id+'?')){await api('DELETE','/v1/keys/'+id);keys()}}
+if($('key').value)connect();else refresh();
+</script>
+</body></html>
