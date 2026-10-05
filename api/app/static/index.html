@@ -35,13 +35,17 @@ async function open_(n){cur=n;clearInterval(timer);const s=await api('GET','/v1/
  <table><tr><th>Partition</th><th>Earliest</th><th>Latest</th><th>Events</th></tr>${s.partitions_detail.map(p=>`<tr><td>${p.partition}</td><td>${p.earliest}</td><td>${p.latest}</td><td>${p.events}</td></tr>`).join('')}</table></div>
  <div class="card"><h3>Publish event</h3><textarea id="ev">{"customer_id":123,"amount":4500,"city":"Bengaluru"}</textarea><div class="row"><button class="p" onclick="pub()">Send</button><input type="file" id="f" accept=".csv,.jsonl,.ndjson,.parquet"><button onclick="up()">Upload file</button></div></div>
  <div class="card"><h3>Schema ${s.schema?'<span class="ok">(active)</span>':'<span class="mu">(none)</span>'}</h3><pre>${JSON.stringify(s.schema||{},null,1)}</pre><textarea id="sc">{"customer_id":"integer","amount":"double"}</textarea><div class="row"><button onclick="addSchema()">Register new version</button></div></div>
- <div class="card"><h3>Consumer lag</h3><div class="row"><input id="grp" value="databricks"><button onclick="lag()">Check</button></div><pre id="lag" hidden></pre></div>
+ <div class="card"><h3>Receiver connection</h3><div class="row"><button onclick="showConn()">Load Kafka connection</button><button onclick="httpRead()">Read next 20 via REST</button></div><pre id="conn" hidden></pre><pre id="httpout" hidden></pre></div>
+ <div class="card"><h3>Consumer lag</h3><div class="row"><input id="grp" value="databricks"><button onclick="registerGroup()">Register group</button><button onclick="lag()">Check</button></div><pre id="lag" hidden></pre></div>
  <div class="card"><div class="row"><h3 style="margin-right:auto">Live tail</h3><label class="mu"><input type="checkbox" id="auto" onchange="auto()"> auto (3s)</label><button onclick="tail()">Refresh</button></div><pre id="tail"></pre></div>`;tail()}
 const parse=t=>{try{return JSON.parse(t)}catch(e){toast('Invalid JSON',1);throw e}};
 async function pub(){const r=await api('POST',`/v1/streams/${cur}/events`,parse($('ev').value));toast('Accepted '+r.accepted);open_(cur)}
 async function up(){const f=$('f').files[0];if(!f)return toast('Pick a file',1);const d=new FormData();d.append('file',f);const r=await api('POST',`/v1/streams/${cur}/upload`,d,true);toast(`Published ${r.published}, DLQ ${r.rejected_to_dlq}`);open_(cur)}
 async function addSchema(){const r=await api('POST',`/v1/streams/${cur}/schemas`,parse($('sc').value));toast('Schema v'+r.version);open_(cur)}
-async function lag(){const r=await api('GET',`/v1/streams/${cur}/consumer-groups/${$('grp').value}/lag`);$('lag').hidden=false;$('lag').textContent=JSON.stringify(r,null,1)}
+async function lag(){const r=await api('GET',`/v1/streams/${cur}/consumer-groups/${encodeURIComponent($('grp').value)}/lag`);$('lag').hidden=false;$('lag').textContent=JSON.stringify(r,null,1)}
+async function registerGroup(){const r=await api('POST',`/v1/streams/${cur}/consumer-groups/${encodeURIComponent($('grp').value)}`);toast('Registered '+r.group)}
+async function showConn(){const r=await api('GET',`/v1/streams/${cur}/connection?group=${encodeURIComponent($('grp').value)}`);$('conn').hidden=false;$('conn').textContent=JSON.stringify(r,null,1)}
+async function httpRead(){const r=await api('GET',`/v1/streams/${cur}/events?partition=0&offset=latest&limit=20&timeout_ms=500`);$('httpout').hidden=false;$('httpout').textContent=JSON.stringify(r,null,1)}
 async function tail(){const r=await api('GET',`/v1/streams/${cur}/peek?limit=20`);$('tail').textContent=r.map(e=>`p${e.partition}@${e.offset}  ${JSON.stringify(e.event.payload)}`).join('\n')||'(empty)'}
 function auto(){clearInterval(timer);if($('auto').checked)timer=setInterval(tail,3000)}
 async function del(){if(confirm('Delete '+cur+'?')){await api('DELETE','/v1/streams/'+cur);$('detail').innerHTML='';load()}}
