@@ -170,6 +170,72 @@ def stream_info(name: str):
 
 
 # ---------- producing ----------
+@app.get("/v1/streams/{name}/connection", dependencies=[Depends(auth)])
+def connection(name: str, group: str = "default-consumer"):
+    st = get_stream(name)
+    return {
+        "bootstrap_server": PUBLIC_BOOTSTRAP,
+        "topic": name,
+        "consumer_group": group,
+        "partitions": st["partitions"],
+        "delivery": "at-least-once",
+        "security": "PLAINTEXT (local development)",
+        "client_examples": {
+            "kafka": {"bootstrap.servers": PUBLIC_BOOTSTRAP, "group.id": group, "topic": name},
+            "databricks": 'spark.readStream.format("kafka").option("kafka.bootstrap.servers", "'
+                + PUBLIC_BOOTSTRAP + '").option("subscribe", "' + name + '").load()'
+        }
+    }
+
+@app.get("/v1/streams/{name}/events", dependencies=[Depends(auth)])
+def read_events(
+    name: str,
+    partition: int = Query(0, ge=0),
+    offset: str = Query("latest"),
+    limit: int = Query(100, ge=1, le=1000),
+    timeout_ms: int = Query(1000, ge=0, le=30000),
+):
+    """REST pull API for receivers that cannot use Kafka directly. It does not commit offsets."""
+    st = get_stream(name)
+    if partition >= st["partitions"]:
+        raise HTTPException(422, "partition out of range")
+    c = Consumer({
+        "bootstrap.servers": BROKERS,
+        "group.id": f"_http_read_{uuid.uuid4()}",
+        "enable.auto.commit": False,
+        "auto.offset.reset": "earliest",
+    })
+    try:
+        lo, hi = c.get_watermark_offsets(TopicPartition(name, partition), timeout=5)
+        if offset == "earliest":
+            start = lo
+        elif offset == "latest":
+            start = hi
+        else:
+            try:
+                start = int(offset)
+            except ValueError:
+                raise HTTPException(422, "offset must be earliest, latest, or an integer")
+        c.assign([TopicPartition(name, partition, max(lo, start))])
+        out = []
+        deadline = time.time() + timeout_ms / 1000
+        while len(out) < limit and time.time() <= deadline:
+            msg = c.poll(min(0.5, max(0.0, deadline-time.time())))
+            if msg is None:
+                continue
+            if msg.error():
+                break
+            try:
+                event = json.loads(msg.value())
+            except Exception:
+                event = {"raw": msg.value().decode(errors="replace")}
+            out.append({"partition": msg.partition(), "offset": msg.offset(), "event": event})
+        next_offset = (out[-1]["offset"] + 1) if out else max(lo, start)
+        return {"stream": name, "partition": partition, "requested_offset": offset,
+                "next_offset": next_offset, "events": out}
+    finally:
+        c.close()
+
 @app.post("/v1/streams/{name}/events", dependencies=[Depends(auth)], status_code=202)
 def publish(name: str, payload: dict):
     s = get_stream(name)
